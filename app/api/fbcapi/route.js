@@ -22,9 +22,8 @@ export default async function handler(req, res) {
       }]
     };
     
-    // Check if the payload was successfully created
-    console.log('FBCAPI Payload:', JSON.stringify(fbcapiPayload));
-
+    console.log('Sending to Facebook CAPI:', JSON.stringify(fbcapiPayload));
+    
     const fbcapiEndpoint = `https://graph.facebook.com/v19.0/${pixelId}/events?access_token=${accessToken}`;
 
     try {
@@ -35,19 +34,22 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify(fbcapiPayload)
       });
-
-      const data = await response.json();
-      console.log('FBCAPI response:', data);
-
-      if (response.ok) {
-        res.status(200).json({ status: 'success', message: 'Event sent to Facebook CAPI' });
-      } else {
-        console.error('FBCAPI Error:', data);
-        res.status(response.status).json({ status: 'error', message: 'Failed to send event to Facebook CAPI', details: data });
+      
+      if (!response.ok) {
+        // If the response is not ok, read the error message from Facebook
+        const errorData = await response.json();
+        console.error('FBCAPI API Error:', errorData);
+        return res.status(response.status).json({ status: 'error', message: 'Failed to send event to Facebook CAPI', details: errorData });
       }
 
+      // If the response is ok, log the success message
+      const successData = await response.json();
+      console.log('FBCAPI Success:', successData);
+      res.status(200).json({ status: 'success', message: 'Event sent to Facebook CAPI' });
+
     } catch (error) {
-      console.error('Fetch error:', error);
+      // This will catch any network or server-side errors
+      console.error('Network or Server-side Fetch Error:', error);
       res.status(500).json({ status: 'error', message: 'Server error during fetch' });
     }
   } else {
