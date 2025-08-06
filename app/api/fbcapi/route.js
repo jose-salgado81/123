@@ -5,20 +5,16 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     const { ga4, fbp, price, currency, event_name, product_name } = req.body;
 
-    // --- Start of Validation and Type Casting ---
-    // Check for required fields
+    // Validation and type casting
     if (!fbp || !price || !currency || !event_name) {
         console.error('Validation Error: Missing required data in request body.', req.body);
         return res.status(400).json({ status: 'error', message: 'Missing required data: fbp, price, currency, or event_name' });
     }
-
-    // Ensure price is a number
     const numericPrice = parseFloat(price);
     if (isNaN(numericPrice)) {
         console.error('Validation Error: Price is not a valid number.');
         return res.status(400).json({ status: 'error', message: 'Price is not a valid number' });
     }
-    // --- End of Validation and Type Casting ---
 
     const fbcapiPayload = {
       data: [{
@@ -29,16 +25,16 @@ export default async function handler(req, res) {
         },
         custom_data: {
           currency: currency,
-          value: numericPrice, // Use the converted number
+          value: numericPrice,
           content_type: 'product',
           content_name: product_name,
           content_ids: [product_name]
         }
       }]
     };
-
-    console.log('FBCAPI Payload:', JSON.stringify(fbcapiPayload));
-
+    
+    console.log('Sending to Facebook CAPI:', JSON.stringify(fbcapiPayload));
+    
     const fbcapiEndpoint = `https://graph.facebook.com/v19.0/${pixelId}/events?access_token=${accessToken}`;
 
     try {
@@ -50,15 +46,21 @@ export default async function handler(req, res) {
         body: JSON.stringify(fbcapiPayload)
       });
       
-      const data = await response.json();
-      
-      if (!response.ok) {
-        console.error('FBCAPI API Error:', data);
-        return res.status(response.status).json({ status: 'error', message: 'Failed to send event to Facebook CAPI', details: data });
+      // Check for a successful response, including the 204 No Content status
+      if (response.status === 204) {
+          console.log('FBCAPI Success: No content returned.');
+          return res.status(200).json({ status: 'success', message: 'Event sent to Facebook CAPI, no content returned.' });
       }
 
-      console.log('FBCAPI Success:', data);
-      res.status(200).json({ status: 'success', message: 'Event sent to Facebook CAPI' });
+      const data = await response.json();
+      
+      if (response.ok) {
+        console.log('FBCAPI Success:', data);
+        res.status(200).json({ status: 'success', message: 'Event sent to Facebook CAPI' });
+      } else {
+        console.error('FBCAPI API Error:', data);
+        res.status(response.status).json({ status: 'error', message: 'Failed to send event to Facebook CAPI', details: data });
+      }
 
     } catch (error) {
       console.error('Network or Server-side Fetch Error:', error);
