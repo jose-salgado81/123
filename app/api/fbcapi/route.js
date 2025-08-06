@@ -21,6 +21,9 @@ export default async function handler(req, res) {
         }
       }]
     };
+    
+    // Check if the payload was successfully created
+    console.log('FBCAPI Payload:', JSON.stringify(fbcapiPayload));
 
     const fbcapiEndpoint = `https://graph.facebook.com/v19.0/${pixelId}/events?access_token=${accessToken}`;
 
