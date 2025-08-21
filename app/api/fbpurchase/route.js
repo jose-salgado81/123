@@ -5,48 +5,56 @@ import Stripe from 'stripe';
 // Create a new Stripe instance with your secret key.
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-// Define the OPTIONS method for CORS preflight requests.
-// This is necessary to allow the front-end to make POST requests.
-export async function OPTIONS() {
-  return new Response(null, {
-    status: 204,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-    },
-  });
-}
-
-// Define the POST method to handle payment creation.
-export async function POST(request) {
+// Define the GET method to handle the payment success page logic.
+// This endpoint will receive the session_id from the URL.
+export async function GET(request) {
   try {
-    // Parse the JSON body from the incoming request.
-    const body = await request.json();
-    const { amount, currency } = body;
+    // Get the URL from the request object.
+    const url = new URL(request.url);
 
-    // Log the received data for debugging purposes.
-    console.log("Received data:", body);
+    // Get the session_id from the URL query parameters.
+    const sessionId = url.searchParams.get('session_id');
 
-    // Create a new PaymentIntent with Stripe.
-    // The amount should be in cents (or the smallest currency unit).
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: amount,
-      currency: currency,
-      automatic_payment_methods: {
-        enabled: true,
-      },
+    // Check if a session ID was provided.
+    if (!sessionId) {
+      return new Response(JSON.stringify({ error: "No session ID provided." }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Retrieve the checkout session from Stripe using the session ID.
+    // We expand the 'payment_intent' object to get details about the payment.
+    const session = await stripe.checkout.sessions.retrieve(sessionId, {
+      expand: ['payment_intent'],
     });
 
-    // Return the client secret to the front-end.
-    // The client secret is used by the front-end to confirm the payment.
-    return new Response(JSON.stringify({ clientSecret: paymentIntent.client_secret }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    // Check if the payment was successful.
+    if (session.payment_intent.status === 'succeeded') {
+      // The payment was successful.
+      // You can now fulfill your order, e.g., send a confirmation email,
+      // update your database, etc.
+      console.log('Payment was successful for session ID:', sessionId);
+      console.log('Payment Intent details:', session.payment_intent);
+
+      // Respond with a success message.
+      return new Response(JSON.stringify({ message: "Payment successful!", session }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } else {
+      // The payment was not successful.
+      console.log('Payment was not successful for session ID:', sessionId);
+
+      // Respond with a failure message.
+      return new Response(JSON.stringify({ message: "Payment was not successful." }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
   } catch (error) {
     // Log any errors that occur during the process.
-    console.error("Error creating Payment Intent:", error);
+    console.error("Error retrieving Stripe session:", error);
 
     // Return an error response to the front-end.
     return new Response(JSON.stringify({ error: error.message }), {
@@ -55,4 +63,3 @@ export async function POST(request) {
     });
   }
 }
-
