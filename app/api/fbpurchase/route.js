@@ -8,6 +8,9 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 // Define the POST method to handle the payment success page logic.
 // This endpoint will receive the session_id in the request body.
 export async function POST(request) {
+  // --- NEW LOG ADDED HERE TO CONFIRM FUNCTION EXECUTION ---
+  console.log("POST function triggered.");
+  
   try {
     // Parse the JSON body from the incoming request.
     const body = await request.json();
@@ -27,7 +30,6 @@ export async function POST(request) {
       expand: ['payment_intent'],
     });
 
-    // --- NEW LOG ADDED HERE ---
     // Log the actual payment intent status returned by Stripe.
     console.log('Stripe payment status:', session.payment_intent.status);
 
