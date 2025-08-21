@@ -27,6 +27,10 @@ export async function POST(request) {
       expand: ['payment_intent'],
     });
 
+    // --- NEW LOG ADDED HERE ---
+    // Log the actual payment intent status returned by Stripe.
+    console.log('Stripe payment status:', session.payment_intent.status);
+
     // Check if the payment was successful.
     if (session.payment_intent.status === 'succeeded') {
       // The payment was successful.
