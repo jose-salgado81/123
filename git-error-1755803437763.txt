@@ -1,0 +1,27 @@
+> git push origin main:main
+remote: error: GH013: Repository rule violations found for refs/heads/main.        
+remote: 
+remote: - GITHUB PUSH PROTECTION        
+remote:   —————————————————————————————————————————        
+remote:     Resolve the following violations before pushing again        
+remote: 
+remote:     - Push cannot contain secrets        
+remote: 
+remote:             
+remote:      (?) Learn how to resolve a blocked push        
+remote:      https://docs.github.com/code-security/secret-scanning/working-with-secret-scanning-and-push-protection/working-with-push-protection-from-the-command-line#resolving-a-blocked-push        
+remote:             
+remote:             
+remote:       —— Stripe API Key ————————————————————————————————————        
+remote:        locations:        
+remote:          - commit: 7aea8c9fadf592934aa309058f69cd6fcad48d8d        
+remote:            path: test-stripe.js:9        
+remote:             
+remote:        (?) To push, remove secret from commit(s) or follow this URL to allow the secret.        
+remote:        https://github.com/jose-salgado81/123/security/secret-scanning/unblock-secret/31br5R8kZflJRcsn3YgnSBtgiIN        
+remote:             
+remote: 
+remote: 
+To https://github.com/jose-salgado81/123.git
+ ! [remote rejected] main -> main (push declined due to repository rule violations)
+error: failed to push some refs to 'https://github.com/jose-salgado81/123.git'
