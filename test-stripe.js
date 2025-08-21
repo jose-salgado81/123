@@ -6,7 +6,8 @@ import Stripe from 'stripe';
 // DO NOT hardcode these values in a production environment.
 // ====================================================================
 
-const YOUR_STRIPE_SECRET_KEY = "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"; // Replace with your Stripe secret key
+// NOTE: We are using a test key because your session ID is a test session ID.
+const YOUR_STRIPE_SECRET_KEY = "sk_test_51OEzb5ElxzHYjrwMgz86Y93903whol1RRR7FCianF7mj6F6OdEnODKiUabRbPtMsQaTJFj8f8AhAdQ9xcZwBytPO00heAMpAq4"; // Replace with your test secret key
 const YOUR_SESSION_ID = "cs_test_a1pltyAAL3VQlNI0wx0anUpAYHW2Bp4QWWIMBcAWtzKzMRNxpdbkRSOaui";         // Replace with a valid session ID from a test checkout
 
 // ====================================================================
