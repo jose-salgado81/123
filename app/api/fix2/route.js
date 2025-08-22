@@ -5,24 +5,23 @@ import Stripe from 'stripe';
 // Create a new Stripe instance with your secret key.
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
+// Hoisted CORS headers to reuse in both OPTIONS and POST responses
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*', // IMPORTANT: In production, replace '*' with your domain(s)
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: corsHeaders,
+  });
+}
+
 // Define the POST method to handle the payment success page logic.
 // This endpoint will receive the session_id in the request body.
 export async function POST(request) {
-  // Define a set of headers that allow CORS.
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*', // IMPORTANT: In a production environment, replace '*' with your specific domain(s) for security.
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-  };
-
-  // Handle the OPTIONS preflight request.
-  if (request.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 204,
-      headers: corsHeaders,
-    });
-  }
-
   // Log to confirm the POST function is triggered after the CORS check.
   console.log("POST function triggered.");
 
