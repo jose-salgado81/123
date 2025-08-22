@@ -10,6 +10,15 @@ const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const FACEBOOK_ACCESS_TOKEN = process.env.FACEBOOK_ACCESS_TOKEN; 
 const FACEBOOK_PIXEL_ID = process.env.FACEBOOK_PIXEL_ID;
 
+// Validate required environment variables early to fail fast
+if (!STRIPE_SECRET_KEY || !FACEBOOK_ACCESS_TOKEN || !FACEBOOK_PIXEL_ID) {
+	console.error('Missing required environment variables for Stripe/Facebook CAPI.', {
+		STRIPE_SECRET_KEY_SET: Boolean(STRIPE_SECRET_KEY),
+		FACEBOOK_ACCESS_TOKEN_SET: Boolean(FACEBOOK_ACCESS_TOKEN),
+		FACEBOOK_PIXEL_ID_SET: Boolean(FACEBOOK_PIXEL_ID)
+	});
+}
+
 // Create a new Stripe instance.
 const stripe = new Stripe(STRIPE_SECRET_KEY);
 
@@ -52,13 +61,23 @@ export async function POST(request) {
         fbc,
         fbp,
         clientUserAgent,
-        sourceUrl
+        sourceUrl,
+        test_event_code: testEventCode,
+        event_id: eventIdFromClient
     } = body;
 
     // Check for essential data from the front-end.
     if (!sessionId) {
         return new Response(JSON.stringify({ error: "No sessionId provided." }), {
             status: 400,
+            headers: { 'Content-Type': 'application/json' },
+        });
+    }
+
+    // Fail fast if required env vars are missing
+    if (!STRIPE_SECRET_KEY || !FACEBOOK_ACCESS_TOKEN || !FACEBOOK_PIXEL_ID) {
+        return new Response(JSON.stringify({ error: "Server misconfiguration: missing required environment variables." }), {
+            status: 500,
             headers: { 'Content-Type': 'application/json' },
         });
     }
@@ -86,6 +105,11 @@ export async function POST(request) {
         const purchaseCurrency = session.currency;
         const lineItems = session.line_items.data;
 
+        // Compute client IP from headers (if available)
+        const xForwardedFor = request.headers?.get?.('x-forwarded-for') || null;
+        const xRealIp = request.headers?.get?.('x-real-ip') || null;
+        const clientIp = (xForwardedFor ? xForwardedFor.split(',')[0].trim() : null) || xRealIp || null;
+
         // --- STEP 2: CONSTRUCT THE FACEBOOK CAPI PAYLOAD ---
         const facebookEventData = {
             data: [{
@@ -93,13 +117,14 @@ export async function POST(request) {
                 event_time: Math.floor(Date.now() / 1000),
                 event_source_url: sourceUrl,
                 action_source: 'website',
+                event_id: eventIdFromClient || session.id,
                 user_data: {
                     // Hash PII for privacy and compliance
                     em: hash(customerDetails?.email),
                     fn: hash(customerDetails?.name),
                     ph: hash(customerDetails?.phone),
                     // Use client data for better attribution and deduplication
-                    client_ip_address: request.headers['x-forwarded-for'] || request.headers['x-real-ip'] || request.ip,
+                    client_ip_address: clientIp,
                     client_user_agent: clientUserAgent,
                     // Use cookies for deduplication
                     fbc: fbc,
@@ -108,21 +133,21 @@ export async function POST(request) {
                     fbclid: fbclid
                 },
                 custom_data: {
-                    currency: purchaseCurrency.toUpperCase(),
-                    value: (purchaseAmount / 100).toFixed(2), // Convert from cents to dollars
+                    currency: purchaseCurrency?.toUpperCase(),
+                    value: purchaseAmount != null ? purchaseAmount / 100 : undefined,
                     // Process line items into a format Facebook can use
-                    contents: lineItems.map(item => ({
-                        id: item.price.product, // Assuming the product ID is what you need
-                        quantity: item.quantity,
-                        item_price: (item.price.unit_amount / 100).toFixed(2)
-                    })),
+                    contents: Array.isArray(lineItems) ? lineItems.map(item => ({
+                        id: item?.price?.product,
+                        quantity: item?.quantity,
+                        item_price: item?.price?.unit_amount != null ? item.price.unit_amount / 100 : undefined
+                    })) : [],
                     content_type: 'product',
-                    content_ids: lineItems.map(item => item.price.product),
-                    num_items: lineItems.reduce((total, item) => total + item.quantity, 0),
+                    content_ids: Array.isArray(lineItems) ? lineItems.map(item => item?.price?.product) : [],
+                    num_items: Array.isArray(lineItems) ? lineItems.reduce((total, item) => total + (item?.quantity || 0), 0) : undefined,
                 },
             }],
-            // Use this optional parameter to ensure your events are deduplicated correctly
-            test_event_code: null // Use 'TESTxxxx' from your Events Manager for testing
+            // Optional: Use test event code from Events Manager for testing
+            test_event_code: testEventCode || null
         };
 
         // --- STEP 3: SEND DATA TO FACEBOOK CAPI ---
@@ -136,12 +161,27 @@ export async function POST(request) {
             body: JSON.stringify(facebookEventData),
         });
 
-        const fbResponseData = await fbResponse.json();
+        let fbResponseData = null;
+        try {
+            fbResponseData = await fbResponse.json();
+        } catch (_) {
+            // Some success responses may be empty
+        }
 
         if (fbResponse.ok) {
             console.log("Purchase event sent to Facebook successfully:", fbResponseData);
         } else {
             console.error("Failed to send Purchase event to Facebook:", fbResponseData);
+            return new Response(JSON.stringify({ 
+                error: 'Failed to send event to Facebook CAPI',
+                facebookResponse: fbResponseData
+            }), {
+                status: fbResponse.status || 502,
+                headers: { 
+                    "Access-Control-Allow-Origin": "*",
+                    'Content-Type': 'application/json' 
+                },
+            });
         }
 
         // --- STEP 4: RESPOND TO FRONT-END ---
