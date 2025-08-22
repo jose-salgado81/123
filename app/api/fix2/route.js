@@ -19,14 +19,26 @@ if (!STRIPE_SECRET_KEY || !FACEBOOK_ACCESS_TOKEN || !FACEBOOK_PIXEL_ID) {
 	});
 }
 
-// Create a new Stripe instance.
-const stripe = new Stripe(STRIPE_SECRET_KEY);
+// Defer Stripe client creation until request time to avoid build-time failures
+function getStripeClient() {
+	if (!STRIPE_SECRET_KEY) {
+		throw new Error('Missing STRIPE_SECRET_KEY');
+	}
+	return new Stripe(STRIPE_SECRET_KEY);
+}
 
 // Function to hash the PII data.
 // It's crucial to hash PII before sending it to Facebook.
 function hash(data) {
     if (!data) return null;
     return crypto.createHash('sha256').update(data.trim().toLowerCase()).digest('hex');
+}
+
+// Remove null/undefined/empty-string values from an object
+function omitNil(obj) {
+	return Object.fromEntries(
+		Object.entries(obj || {}).filter(([, v]) => v !== null && v !== undefined && v !== '')
+	);
 }
 
 // Define the OPTIONS method for CORS preflight requests.
@@ -85,6 +97,7 @@ export async function POST(request) {
     try {
         // --- STEP 1: RETRIEVE PURCHASE DATA FROM STRIPE ---
         // Retrieve the full Stripe session, including the payment details and line items.
+        const stripe = getStripeClient();
         const session = await stripe.checkout.sessions.retrieve(sessionId, {
             expand: ['payment_intent', 'line_items'],
         });
@@ -110,6 +123,33 @@ export async function POST(request) {
         const xRealIp = request.headers?.get?.('x-real-ip') || null;
         const clientIp = (xForwardedFor ? xForwardedFor.split(',')[0].trim() : null) || xRealIp || null;
 
+        // Build user_data and ensure at least one identifier exists
+        const userData = omitNil({
+            em: hash(customerDetails?.email),
+            fn: hash(customerDetails?.name),
+            ph: hash(customerDetails?.phone),
+            client_ip_address: clientIp,
+            client_user_agent: clientUserAgent,
+            fbc: fbc,
+            fbp: fbp,
+            fbclid: fbclid
+        });
+        const hasIdentifier = Boolean(userData.em || userData.ph || userData.fbp || userData.fbc);
+        if (!hasIdentifier) {
+            return new Response(JSON.stringify({ 
+                error: 'Missing required user identifiers for Facebook CAPI (need at least one of email, phone, fbp, or fbc).'
+            }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
+
+        // Compute value fallback if needed
+        const computedValue = Array.isArray(lineItems)
+            ? lineItems.reduce((sum, item) => sum + ((item?.price?.unit_amount || 0) * (item?.quantity || 0)), 0) / 100
+            : undefined;
+        const valueToSend = purchaseAmount != null ? purchaseAmount / 100 : computedValue;
+
         // --- STEP 2: CONSTRUCT THE FACEBOOK CAPI PAYLOAD ---
         const facebookEventData = {
             data: [{
@@ -118,33 +158,19 @@ export async function POST(request) {
                 event_source_url: sourceUrl,
                 action_source: 'website',
                 event_id: eventIdFromClient || session.id,
-                user_data: {
-                    // Hash PII for privacy and compliance
-                    em: hash(customerDetails?.email),
-                    fn: hash(customerDetails?.name),
-                    ph: hash(customerDetails?.phone),
-                    // Use client data for better attribution and deduplication
-                    client_ip_address: clientIp,
-                    client_user_agent: clientUserAgent,
-                    // Use cookies for deduplication
-                    fbc: fbc,
-                    fbp: fbp,
-                    // Use click ID for attribution
-                    fbclid: fbclid
-                },
-                custom_data: {
+                user_data: userData,
+                custom_data: omitNil({
                     currency: purchaseCurrency?.toUpperCase(),
-                    value: purchaseAmount != null ? purchaseAmount / 100 : undefined,
-                    // Process line items into a format Facebook can use
-                    contents: Array.isArray(lineItems) ? lineItems.map(item => ({
+                    value: valueToSend,
+                    contents: Array.isArray(lineItems) ? lineItems.map(item => omitNil({
                         id: item?.price?.product,
                         quantity: item?.quantity,
                         item_price: item?.price?.unit_amount != null ? item.price.unit_amount / 100 : undefined
-                    })) : [],
+                    })).filter(c => c.id) : [],
                     content_type: 'product',
-                    content_ids: Array.isArray(lineItems) ? lineItems.map(item => item?.price?.product) : [],
+                    content_ids: Array.isArray(lineItems) ? lineItems.map(item => item?.price?.product).filter(Boolean) : [],
                     num_items: Array.isArray(lineItems) ? lineItems.reduce((total, item) => total + (item?.quantity || 0), 0) : undefined,
-                },
+                }),
             }],
             // Optional: Use test event code from Events Manager for testing
             test_event_code: testEventCode || null
