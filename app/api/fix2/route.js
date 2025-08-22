@@ -1,82 +1,170 @@
-// Import the Stripe library.
-// The secret key should be set as an environment variable in Vercel.
+// Import necessary libraries.
+// You will need to install 'crypto' and 'stripe' if they're not already installed.
+// npm install crypto stripe
+
 import Stripe from 'stripe';
+import crypto from 'crypto';
 
-// Create a new Stripe instance with your secret key.
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+// Replace with your actual values from Vercel's environment variables.
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+const FACEBOOK_ACCESS_TOKEN = process.env.FACEBOOK_ACCESS_TOKEN; 
+const FACEBOOK_PIXEL_ID = process.env.FACEBOOK_PIXEL_ID;
 
-// Define the POST method to handle the payment success page logic.
-// This endpoint will receive the session_id in the request body.
-export async function POST(request) {
-  // Define a set of headers that allow CORS.
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*', // IMPORTANT: In a production environment, replace '*' with your specific domain(s) for security.
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-  };
+// Create a new Stripe instance.
+const stripe = new Stripe(STRIPE_SECRET_KEY);
 
-  // Handle the OPTIONS preflight request.
-  if (request.method === 'OPTIONS') {
+// Function to hash the PII data.
+// It's crucial to hash PII before sending it to Facebook.
+function hash(data) {
+    if (!data) return null;
+    return crypto.createHash('sha256').update(data.trim().toLowerCase()).digest('hex');
+}
+
+// Define the OPTIONS method for CORS preflight requests.
+// This is necessary to allow the front-end to make POST requests from a different domain.
+export async function OPTIONS() {
     return new Response(null, {
-      status: 204,
-      headers: corsHeaders,
+        status: 204,
+        headers: {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
+        },
     });
-  }
+}
 
-  // Log to confirm the POST function is triggered after the CORS check.
-  console.log("POST function triggered.");
+// Main POST function to handle the purchase event.
+export async function POST(request) {
+    let body;
+    try {
+        body = await request.json();
+        console.log("Received data from front-end:", body);
+    } catch (error) {
+        return new Response(JSON.stringify({ error: "Invalid JSON in request body." }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+        });
+    }
 
-  try {
-    // Parse the JSON body from the incoming request.
-    const body = await request.json();
-    const { sessionId } = body;
+    const { 
+        sessionId,
+        fbclid,
+        fbc,
+        fbp,
+        clientUserAgent,
+        sourceUrl
+    } = body;
 
-    // Check if a session ID was provided.
+    // Check for essential data from the front-end.
     if (!sessionId) {
-      return new Response(JSON.stringify({ error: "No session ID provided." }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+        return new Response(JSON.stringify({ error: "No sessionId provided." }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+        });
     }
 
-    // Retrieve the checkout session from Stripe using the session ID.
-    const session = await stripe.checkout.sessions.retrieve(sessionId, {
-      expand: ['payment_intent', 'line_items'],
-    });
+    try {
+        // --- STEP 1: RETRIEVE PURCHASE DATA FROM STRIPE ---
+        // Retrieve the full Stripe session, including the payment details and line items.
+        const session = await stripe.checkout.sessions.retrieve(sessionId, {
+            expand: ['payment_intent', 'line_items'],
+        });
 
-    // Log the actual payment intent status returned by Stripe.
-    console.log('Stripe payment status:', session.payment_intent.status);
-    console.log('Line items:', session.line_items);
+        // Ensure the payment was successful.
+        if (session.payment_intent.status !== 'succeeded') {
+            return new Response(JSON.stringify({ error: 'Payment not succeeded' }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
 
-    // Check if the payment was successful.
-    if (session.payment_intent.status === 'succeeded') {
-      // The payment was successful.
-      console.log('Payment was successful for session ID:', sessionId);
-      console.log('Payment Intent details:', session.payment_intent);
+        console.log("Stripe session retrieved successfully.");
 
-      // Respond with a success message.
-      return new Response(JSON.stringify({ message: "Payment successful!", session }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    } else {
-      // The payment was not successful.
-      console.log('Payment was not successful for session ID:', sessionId);
+        // Extract and process customer and purchase data.
+        const customerDetails = session.customer_details;
+        const purchaseAmount = session.amount_total;
+        const purchaseCurrency = session.currency;
+        const lineItems = session.line_items.data;
 
-      // Respond with a failure message.
-      return new Response(JSON.stringify({ message: "Payment was not successful." }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+        // --- STEP 2: CONSTRUCT THE FACEBOOK CAPI PAYLOAD ---
+        const facebookEventData = {
+            data: [{
+                event_name: 'Purchase',
+                event_time: Math.floor(Date.now() / 1000),
+                event_source_url: sourceUrl,
+                action_source: 'website',
+                user_data: {
+                    // Hash PII for privacy and compliance
+                    em: hash(customerDetails?.email),
+                    fn: hash(customerDetails?.name),
+                    ph: hash(customerDetails?.phone),
+                    // Use client data for better attribution and deduplication
+                    client_ip_address: request.headers['x-forwarded-for'] || request.headers['x-real-ip'] || request.ip,
+                    client_user_agent: clientUserAgent,
+                    // Use cookies for deduplication
+                    fbc: fbc,
+                    fbp: fbp,
+                    // Use click ID for attribution
+                    fbclid: fbclid
+                },
+                custom_data: {
+                    currency: purchaseCurrency.toUpperCase(),
+                    value: (purchaseAmount / 100).toFixed(2), // Convert from cents to dollars
+                    // Process line items into a format Facebook can use
+                    contents: lineItems.map(item => ({
+                        id: item.price.product, // Assuming the product ID is what you need
+                        quantity: item.quantity,
+                        item_price: (item.price.unit_amount / 100).toFixed(2)
+                    })),
+                    content_type: 'product',
+                    content_ids: lineItems.map(item => item.price.product),
+                    num_items: lineItems.reduce((total, item) => total + item.quantity, 0),
+                },
+            }],
+            // Use this optional parameter to ensure your events are deduplicated correctly
+            test_event_code: null // Use 'TESTxxxx' from your Events Manager for testing
+        };
+
+        // --- STEP 3: SEND DATA TO FACEBOOK CAPI ---
+        const fbEndpoint = `https://graph.facebook.com/v20.0/${FACEBOOK_PIXEL_ID}/events?access_token=${FACEBOOK_ACCESS_TOKEN}`;
+
+        const fbResponse = await fetch(fbEndpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(facebookEventData),
+        });
+
+        const fbResponseData = await fbResponse.json();
+
+        if (fbResponse.ok) {
+            console.log("Purchase event sent to Facebook successfully:", fbResponseData);
+        } else {
+            console.error("Failed to send Purchase event to Facebook:", fbResponseData);
+        }
+
+        // --- STEP 4: RESPOND TO FRONT-END ---
+        return new Response(JSON.stringify({ 
+            message: 'Purchase event processed and sent to Facebook', 
+            stripeSession: session,
+            facebookResponse: fbResponseData
+        }), {
+            status: 200,
+            headers: { 
+                "Access-Control-Allow-Origin": "*",
+                'Content-Type': 'application/json' 
+            },
+        });
+
+    } catch (error) {
+        console.error("Error in CAPI function:", error);
+        return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { 
+                "Access-Control-Allow-Origin": "*",
+                'Content-Type': 'application/json' 
+            },
+        });
     }
-  } catch (error) {
-    // Log any errors that occur during the process.
-    console.error("Error retrieving Stripe session:", error);
-
-    // Return an error response to the front-end.
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
 }
