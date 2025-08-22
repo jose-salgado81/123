@@ -41,11 +41,12 @@ export async function POST(request) {
 
     // Retrieve the checkout session from Stripe using the session ID.
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
-      expand: ['payment_intent'],
+      expand: ['payment_intent', 'line_items'],
     });
 
     // Log the actual payment intent status returned by Stripe.
     console.log('Stripe payment status:', session.payment_intent.status);
+    console.log('Line items:', session.line_items);
 
     // Check if the payment was successful.
     if (session.payment_intent.status === 'succeeded') {
