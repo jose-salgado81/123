@@ -118,10 +118,14 @@ export async function POST(request) {
         const purchaseCurrency = session.currency;
         const lineItems = session.line_items.data;
 
-        // Compute client IP from headers (if available)
+        // Compute client IP and header-derived context (if available)
         const xForwardedFor = request.headers?.get?.('x-forwarded-for') || null;
         const xRealIp = request.headers?.get?.('x-real-ip') || null;
         const clientIp = (xForwardedFor ? xForwardedFor.split(',')[0].trim() : null) || xRealIp || null;
+        const headerUserAgent = request.headers?.get?.('user-agent') || null;
+        const referer = request.headers?.get?.('referer') || null;
+        const effectiveUserAgent = clientUserAgent || headerUserAgent;
+        const effectiveSourceUrl = sourceUrl || referer;
 
         // Build user_data and ensure at least one identifier exists
         const userData = omitNil({
@@ -129,7 +133,7 @@ export async function POST(request) {
             fn: hash(customerDetails?.name),
             ph: hash(customerDetails?.phone),
             client_ip_address: clientIp,
-            client_user_agent: clientUserAgent,
+            client_user_agent: effectiveUserAgent,
             fbc: fbc,
             fbp: fbp,
             fbclid: fbclid
@@ -155,7 +159,7 @@ export async function POST(request) {
             data: [{
                 event_name: 'Purchase',
                 event_time: Math.floor(Date.now() / 1000),
-                event_source_url: sourceUrl,
+                event_source_url: effectiveSourceUrl,
                 action_source: 'website',
                 event_id: eventIdFromClient || session.id,
                 user_data: userData,
