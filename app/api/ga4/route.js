@@ -22,6 +22,7 @@ export async function POST(req) {
       data: [{
         event_name: event_name,
         event_time: Math.floor(Date.now() / 1000), 
+        action_source: 'website',
         user_data: {
           fbp: fbp,
         },
