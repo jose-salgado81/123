@@ -30,16 +30,19 @@ export async function POST(request) {
 
     const { first_name, email, fbp } = body;
 
+    // Generate a unique event_id for deduplication
+    const eventId = crypto.randomUUID();
+
     // Build the data payload for Facebook CAPI
     const facebookEventData = {
         data: [{
             event_name: 'Lead', // or 'Purchase', 'CompleteRegistration', etc.
             event_time: Math.floor(Date.now() / 1000), // Current timestamp in seconds
+            event_id: eventId, // <--- added event_id
             user_data: {
                 fn: hash(first_name),
                 em: hash(email),
                 fbp: fbp,
-                // Add other user data if available (e.g., phone number, last name, city)
             },
             custom_data: {
                 // Add any custom properties (e.g., value, currency)
@@ -72,7 +75,11 @@ export async function POST(request) {
         console.error("Error sending event to Facebook:", error);
     }
 
-    return new Response(JSON.stringify({ message: 'Data received and processed', data: body }), {
+    return new Response(JSON.stringify({ 
+        message: 'Data received and processed', 
+        data: body, 
+        event_id: eventId // return it so you can debug if needed
+    }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
     });
