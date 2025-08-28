@@ -1,3 +1,6 @@
+// You will need to install the 'crypto' library to hash data
+// npm install crypto
+
 import crypto from 'crypto';
 
 // Replace with your actual values
@@ -35,6 +38,9 @@ export async function POST(request) {
     const facebookEventData = {
         test_event_code: TEST_EVENT_CODE, // <-- top-level for test events
         data: [{
+            event_name: 'Lead', // or 'Purchase', 'CompleteRegistration', etc.
+            event_time: Math.floor(Date.now() / 1000), // Current timestamp in seconds
+            event_id: eventId, // <--- added event_id
             event_name: 'Lead',
             event_time: Math.floor(Date.now() / 1000),
             event_id: eventId,
@@ -44,18 +50,22 @@ export async function POST(request) {
                 fbp: fbp,
             },
             custom_data: {
+                // Add any custom properties (e.g., value, currency)
                 debug_event_id: eventId,
             },
             action_source: 'website',
         }],
     };
 
+    // Send the data to Facebook CAPI
     const fbEndpoint = `https://graph.facebook.com/v20.0/${FACEBOOK_PIXEL_ID}/events?access_token=${FACEBOOK_ACCESS_TOKEN}`;
 
     try {
         const fbResponse = await fetch(fbEndpoint, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+            },
             body: JSON.stringify(facebookEventData),
         });
 
@@ -74,7 +84,7 @@ export async function POST(request) {
     return new Response(JSON.stringify({ 
         message: 'Data received and processed', 
         data: body, 
-        event_id: eventId 
+        event_id: eventId // return it so you can debug if needed
     }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
