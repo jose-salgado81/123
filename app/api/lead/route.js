@@ -5,7 +5,7 @@ import crypto from 'crypto';
 
 // Replace with your actual values
 const FACEBOOK_ACCESS_TOKEN = 'EAAUmJiUQKVgBPFtnfTiI9OQZBIfGN8puRKR9j9WdCaIjahJDjGQh7KJDJQh8wgfAZBGCdIjBN1PMGYvDzlAjvwrbu8FCpZChDei6q1qZBLVESbYYxWRkG7COuhGgZBnMZCaR2WxfK8zZCZBVsMV8CiV8gUWeT0PYXt12EqpTlZBpLy7nvC0KXSz51aPRSLZAbkqIGS6iSpUcri3Cf25j8reIlmfvROjtOuRVYRc7Tk'; 
-const FACEBOOK_PIXEL_ID = '105100000000076632';
+const FACEBOOK_PIXEL_ID = '1051240707176632';
 
 // Function to hash the PII data
 function hash(data) {
