@@ -3,7 +3,7 @@ import crypto from 'crypto';
 // Replace with your actual values
 const FACEBOOK_ACCESS_TOKEN = 'EAAUmJiUQKVgBPFtnfTiI9OQZBIfGN8puRKR9j9WdCaIjahJDjGQh7KJDJQh8wgfAZBGCdIjBN1PMGYvDzlAjvwrbu8FCpZChDei6q1qZBLVESbYYxWRkG7COuhGgZBnMZCaR2WxfK8zZCZBVsMV8CiV8gUWeT0PYXt12EqpTlZBpLy7nvC0KXSz51aPRSLZAbkqIGS6iSpUcri3Cf25j8reIlmfvROjtOuRVYRc7Tk'; 
 const FACEBOOK_PIXEL_ID = '1051240707176632';
-const TEST_EVENT_CODE = 'TEST76749'; // <-- add your test code here
+const TEST_EVENT_CODE = 'TEST76749'; // your test code
 
 // Function to hash the PII data
 function hash(data) {
@@ -33,20 +33,20 @@ export async function POST(request) {
 
     // Build the data payload for Facebook CAPI
     const facebookEventData = {
+        test_event_code: TEST_EVENT_CODE, // <-- top-level for test events
         data: [{
             event_name: 'Lead',
             event_time: Math.floor(Date.now() / 1000),
-            event_id: eventId, // for deduplication
+            event_id: eventId,
             user_data: {
                 fn: hash(first_name),
                 em: hash(email),
                 fbp: fbp,
             },
             custom_data: {
-                debug_event_id: eventId, // makes it easier to filter in Events Manager
+                debug_event_id: eventId,
             },
             action_source: 'website',
-            test_event_code: TEST_EVENT_CODE // <-- added test_event_code
         }],
     };
 
