@@ -1,11 +1,9 @@
-// You will need to install the 'crypto' library to hash data
-// npm install crypto
-
 import crypto from 'crypto';
 
 // Replace with your actual values
 const FACEBOOK_ACCESS_TOKEN = 'EAAUmJiUQKVgBPFtnfTiI9OQZBIfGN8puRKR9j9WdCaIjahJDjGQh7KJDJQh8wgfAZBGCdIjBN1PMGYvDzlAjvwrbu8FCpZChDei6q1qZBLVESbYYxWRkG7COuhGgZBnMZCaR2WxfK8zZCZBVsMV8CiV8gUWeT0PYXt12EqpTlZBpLy7nvC0KXSz51aPRSLZAbkqIGS6iSpUcri3Cf25j8reIlmfvROjtOuRVYRc7Tk'; 
 const FACEBOOK_PIXEL_ID = '1051240707176632';
+const TEST_EVENT_CODE = 'TEST76749'; // <-- add your test code here
 
 // Function to hash the PII data
 function hash(data) {
@@ -36,30 +34,28 @@ export async function POST(request) {
     // Build the data payload for Facebook CAPI
     const facebookEventData = {
         data: [{
-            event_name: 'Lead', // or 'Purchase', 'CompleteRegistration', etc.
-            event_time: Math.floor(Date.now() / 1000), // Current timestamp in seconds
-            event_id: eventId, // <--- added event_id
+            event_name: 'Lead',
+            event_time: Math.floor(Date.now() / 1000),
+            event_id: eventId, // for deduplication
             user_data: {
                 fn: hash(first_name),
                 em: hash(email),
                 fbp: fbp,
             },
             custom_data: {
-                // Add any custom properties (e.g., value, currency)
+                debug_event_id: eventId, // makes it easier to filter in Events Manager
             },
             action_source: 'website',
+            test_event_code: TEST_EVENT_CODE // <-- added test_event_code
         }],
     };
 
-    // Send the data to Facebook CAPI
     const fbEndpoint = `https://graph.facebook.com/v20.0/${FACEBOOK_PIXEL_ID}/events?access_token=${FACEBOOK_ACCESS_TOKEN}`;
 
     try {
         const fbResponse = await fetch(fbEndpoint, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(facebookEventData),
         });
 
@@ -78,7 +74,7 @@ export async function POST(request) {
     return new Response(JSON.stringify({ 
         message: 'Data received and processed', 
         data: body, 
-        event_id: eventId // return it so you can debug if needed
+        event_id: eventId 
     }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
