@@ -1,0 +1,47 @@
+<script>
+  // This function runs when the page has fully loaded
+  document.addEventListener('DOMContentLoaded', async () => {
+    try {
+      // 1. Get the current page's URL
+      const url = new URL(window.location.href);
+
+      // 2. Extract the 'session_id' from the URL parameters
+      const sessionId = url.searchParams.get('session_id');
+
+      // The Beeceptor endpoint you provided
+      const endpoint = 'https://123-five-gamma.vercel.app/api/stripebuytofb';
+
+      // 3. Check if the session_id was found
+      if (sessionId) {
+        console.log('Stripe Session ID found:', sessionId);
+
+        // 4. Send the session ID to the Vercel function endpoint
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            sessionId: sessionId,
+            source: 'wordpress_direct_html'
+          }),
+        });
+
+        const data = await response.json();
+        console.log('Vercel function response:', data);
+
+        // Optional: Log a success or failure message
+        if (response.ok) {
+          console.log('Purchase event successfully sent to Beeceptor.');
+        } else {
+          console.error('Failed to send purchase event. Server returned:', response.status);
+        }
+
+      } else {
+        console.warn('Stripe Session ID not found in the URL. Purchase event not sent.');
+      }
+    } catch (error) {
+      console.error('An error occurred:', error);
+    }
+  });
+</script>
