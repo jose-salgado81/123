@@ -5,16 +5,15 @@
       const sessionId = url.searchParams.get('session_id');
       const endpoint = 'https://123-five-gamma.vercel.app/api/stripebuytofb';
 
-      // Helper function to get a cookie value by name
       function getCookie(name) {
         const value = `; ${document.cookie}`;
         const parts = value.split(`; ${name}=`);
         if (parts.length === 2) return parts.pop().split(';').shift();
       }
 
-      // Get Facebook cookies if present
       const fbc = getCookie('_fbc');
       const fbp = getCookie('_fbp');
+      const userAgent = navigator.userAgent; // Get browser user agent
 
       if (sessionId) {
         console.log('Stripe Session ID found:', sessionId);
@@ -28,7 +27,8 @@
             sessionId: sessionId,
             source: 'wordpress_direct_html',
             fbc: fbc,
-            fbp: fbp
+            fbp: fbp,
+            userAgent: userAgent // Send user agent
           }),
         });
 
@@ -36,7 +36,7 @@
         console.log('Vercel function response:', data);
 
         if (response.ok) {
-          console.log('Purchase event successfully sent to Beeceptor.');
+          console.log('Purchase event successfully sent to https://123-five-gamma.vercel.app/api/stripebuytofb.');
         } else {
           console.error('Failed to send purchase event. Server returned:', response.status);
         }
