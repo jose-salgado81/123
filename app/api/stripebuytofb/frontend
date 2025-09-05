@@ -4,6 +4,7 @@
       const url = new URL(window.location.href);
       const sessionId = url.searchParams.get('session_id');
       const endpoint = 'https://123-five-gamma.vercel.app/api/stripebuytofb';
+      const fbclid = url.searchParams.get('fbclid'); // Get fbclid from URL
 
       function getCookie(name) {
         const value = `; ${document.cookie}`;
@@ -29,6 +30,7 @@
             fbc: fbc,
             fbp: fbp,
             userAgent: userAgent // Send user agent
+            fbclid: fbclid // Send fbclid
           }),
         });
 
