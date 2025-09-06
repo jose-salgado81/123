@@ -1,52 +1,60 @@
 <script>
-  document.addEventListener('DOMContentLoaded', async () => {
-    try {
-      const url = new URL(window.location.href);
-      const sessionId = url.searchParams.get('session_id');
-      const endpoint = 'https://123-five-gamma.vercel.app/api/stripebuytofb';
-      const fbclid = url.searchParams.get('fbclid'); // Get fbclid from URL
+    // This script fires a server-side event for the Facebook Conversions API
+    // It's designed to be used as a Custom HTML tag in Google Tag Manager.
+    // NOTE: This version is compatible with GTM's older JavaScript engine (ES5).
 
-      function getCookie(name) {
-        const value = `; ${document.cookie}`;
-        const parts = value.split(`; ${name}=`);
-        if (parts.length === 2) return parts.pop().split(';').shift();
-      }
+    // Get the sessionId from the URL. This is the key that links the client to the server.
+    var url = new URL(window.location.href);
+    var sessionId = url.searchParams.get('session_id');
 
-      const fbc = getCookie('_fbc');
-      const fbp = getCookie('_fbp');
-      const userAgent = navigator.userAgent; // Get browser user agent
+    // Only proceed if a sessionId is present, indicating a successful Stripe purchase.
+    if (sessionId) {
+        // Retrieve the values from your GTM variables using the double-bracket notation.
+        var fbcid = '{{fbcid}}';
+        var fbc = '{{fbc}}';
+        var fbp = '{{fbp}}';
+        var userAgent = navigator.userAgent;
+        var sourceUrl = window.location.href;
 
-      if (sessionId) {
-        console.log('Stripe Session ID found:', sessionId);
+        // Log the data for debugging in the browser console.
+        console.log("Stripe Session ID found:", sessionId);
+        console.log("Facebook Tracking Data Captured by GTM:");
+        console.log('fbcid: ' + (fbcid || 'Not Found'));
+        console.log('fbc: ' + (fbc || 'Not Found'));
+        console.log('fbp: ' + (fbp || 'Not Found'));
+        console.log("User Agent:", userAgent);
+        console.log("Source URL:", sourceUrl);
 
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            sessionId: sessionId,
-            source: 'wordpress_direct_html',
-            fbc: fbc,
-            fbp: fbp,
-            userAgent: userAgent // Send user agent
-            fbclid: fbclid // Send fbclid
-          }),
+        // Define your Vercel API endpoint.
+        var endpoint = 'https://123-five-gamma.vercel.app/api/stripebuytofb';
+
+        // Send the data to your Vercel endpoint using standard fetch with promises.
+        fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                sessionId: sessionId,
+                source: 'gtm_tag',
+                fbc: fbc,
+                fbp: fbp,
+                userAgent: userAgent,
+                fbclid: fbcid, // The label has been changed from 'fbcid' to 'fbclid'.
+                sourceUrl: sourceUrl
+            })
+        })
+        .then(function(response) {
+            return response.json();
+        })
+        .then(function(data) {
+            console.log('Vercel function response:', data);
+        })
+        .catch(function(error) {
+            console.error('An error occurred while sending data to Vercel:', error);
         });
 
-        const data = await response.json();
-        console.log('Vercel function response:', data);
-
-        if (response.ok) {
-          console.log('Purchase event successfully sent to https://123-five-gamma.vercel.app/api/stripebuytofb.');
-        } else {
-          console.error('Failed to send purchase event. Server returned:', response.status);
-        }
-      } else {
-        console.warn('Stripe Session ID not found in the URL. Purchase event not sent.');
-      }
-    } catch (error) {
-      console.error('An error occurred:', error);
+    } else {
+        console.warn('Stripe Session ID not found in the URL. CAPI event not sent.');
     }
-  });
 </script>

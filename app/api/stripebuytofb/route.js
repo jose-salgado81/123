@@ -104,8 +104,6 @@ export async function POST(request) {
                     // Use cookies for deduplication
                     fbc: fbc,
                     fbp: fbp,
-                    // Use click ID for attribution
-                    fbclid: fbclid
                 },
                 custom_data: {
                     currency: purchaseCurrency.toUpperCase(),
