@@ -1,22 +1,17 @@
 <script>
-    // This script fires a server-side event for the Facebook Conversions API
-    // It's designed to be used as a Custom HTML tag in Google Tag Manager.
-    // NOTE: This version is compatible with GTM's older JavaScript engine (ES5).
-
-    // Get the sessionId from the URL. This is the key that links the client to the server.
     var url = new URL(window.location.href);
     var sessionId = url.searchParams.get('session_id');
 
-    // Only proceed if a sessionId is present, indicating a successful Stripe purchase.
     if (sessionId) {
-        // Retrieve the values from your GTM variables using the double-bracket notation.
         var fbcid = '{{fbcid}}';
         var fbc = '{{fbc}}';
         var fbp = '{{fbp}}';
         var userAgent = navigator.userAgent;
         var sourceUrl = window.location.href;
 
-        // Log the data for debugging in the browser console.
+        // Generate a unique event_id
+        var eventId = 'evt_' + Date.now() + '_' + Math.floor(Math.random() * 1000000);
+
         console.log("Stripe Session ID found:", sessionId);
         console.log("Facebook Tracking Data Captured by GTM:");
         console.log('fbcid: ' + (fbcid || 'Not Found'));
@@ -24,11 +19,10 @@
         console.log('fbp: ' + (fbp || 'Not Found'));
         console.log("User Agent:", userAgent);
         console.log("Source URL:", sourceUrl);
+        console.log("Event ID:", eventId);
 
-        // Define your Vercel API endpoint.
         var endpoint = 'https://123-five-gamma.vercel.app/api/stripebuytofb';
 
-        // Send the data to your Vercel endpoint using standard fetch with promises.
         fetch(endpoint, {
             method: 'POST',
             headers: {
@@ -40,8 +34,9 @@
                 fbc: fbc,
                 fbp: fbp,
                 userAgent: userAgent,
-                fbclid: fbcid, // The label has been changed from 'fbcid' to 'fbclid'.
-                sourceUrl: sourceUrl
+                fbclid: fbcid,
+                sourceUrl: sourceUrl,
+                event_id: eventId // Include event_id
             })
         })
         .then(function(response) {
