@@ -141,6 +141,22 @@ export async function POST(request) {
         } else {
             console.error("Failed to send Purchase event to Facebook:", fbResponseData);
         }
+            // --- STEP 3b: SEND SAME DATA TO BEECEPTOR ---
+        const beeceptorEndpoint = 'https://controlcopy.free.beeceptor.com';
+        let beeceptorResponseData = null;
+        try {
+            const beeceptorResponse = await fetch(beeceptorEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(facebookEventData),
+            });
+            beeceptorResponseData = await beeceptorResponse.json();
+            console.log("Payload sent to Beeceptor:", beeceptorResponseData);
+        } catch (beeceptorError) {
+            console.error("Failed to send payload to Beeceptor:", beeceptorError);
+        }
 
         // --- STEP 4: RESPOND TO FRONT-END ---
         return new Response(JSON.stringify({ 
