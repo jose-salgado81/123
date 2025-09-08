@@ -24,21 +24,65 @@ export async function POST(request) {
     });
   }
 
-  const { fbc, fbp, sourceUrl } = body;
-
-  const facebookEventData = {
-    data: [{
-      event_name: 'OutboundClick',
-      event_time: Math.floor(Date.now() / 1000),
-      event_source_url: sourceUrl,
-      action_source: 'website',
-      user_data: {
-        fbc,
-        fbp
+  // Validate required environment variables
+  if (!FACEBOOK_ACCESS_TOKEN || !FACEBOOK_PIXEL_ID) {
+    return new Response(
+      JSON.stringify({
+        error: "Facebook credentials not configured",
+        details: {
+          FACEBOOK_PIXEL_ID: !!FACEBOOK_PIXEL_ID,
+          FACEBOOK_ACCESS_TOKEN: !!FACEBOOK_ACCESS_TOKEN,
+        },
+      }),
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
       }
-    }],
-    test_event_code: null // Optional: add your test code here
+    );
+  }
+
+  const { fbc, fbp, sourceUrl, testEventCode } = body;
+
+  // Basic input validation
+  if (!sourceUrl) {
+    return new Response(JSON.stringify({ error: "Missing required field: sourceUrl" }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  if (!fbc && !fbp) {
+    return new Response(
+      JSON.stringify({ error: "At least one of fbc or fbp is required" }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
+  // Helpful additional user data for Facebook attribution
+  const userAgent = request.headers.get('user-agent') || undefined;
+  const xff = request.headers.get('x-forwarded-for');
+  const clientIpAddress = (xff && xff.split(',')[0].trim()) || undefined;
+
+  const event = {
+    event_name: 'OutboundClick',
+    event_time: Math.floor(Date.now() / 1000),
+    event_source_url: sourceUrl,
+    action_source: 'website',
+    user_data: {
+      fbc,
+      fbp,
+      client_user_agent: userAgent,
+      client_ip_address: clientIpAddress,
+    },
   };
+
+  const facebookEventData = { data: [event] };
+
+  // Allow passing a test event code from body or env; omit if not set
+  const resolvedTestCode = testEventCode || process.env.FB_TEST_EVENT_CODE;
+  if (resolvedTestCode) {
+    facebookEventData.test_event_code = resolvedTestCode;
+  }
 
   const fbEndpoint = `https://graph.facebook.com/v20.0/${FACEBOOK_PIXEL_ID}/events?access_token=${FACEBOOK_ACCESS_TOKEN}`;
 
@@ -54,19 +98,30 @@ export async function POST(request) {
     if (fbResponse.ok) {
       console.log("OutboundClick event sent successfully:", fbResponseData);
     } else {
-      console.error("Facebook CAPI error:", fbResponseData);
+      console.error("Facebook CAPI error:", {
+        status: fbResponse.status,
+        statusText: fbResponse.statusText,
+        response: fbResponseData,
+      });
     }
 
-    return new Response(JSON.stringify({
-      message: 'OutboundClick event sent to Facebook',
-      facebookResponse: fbResponseData
-    }), {
-      status: 200,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        'Content-Type': 'application/json'
-      },
-    });
+    return new Response(
+      JSON.stringify({
+        success: fbResponse.ok,
+        message: fbResponse.ok
+          ? 'OutboundClick event sent to Facebook'
+          : 'Facebook CAPI returned an error',
+        facebookResponse: fbResponseData,
+        status: fbResponse.status,
+      }),
+      {
+        status: fbResponse.ok ? 200 : fbResponse.status || 502,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          'Content-Type': 'application/json',
+        },
+      }
+    );
 
   } catch (error) {
     console.error("Error sending to Facebook CAPI:", error);
