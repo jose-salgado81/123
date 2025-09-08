@@ -5,19 +5,47 @@
   var fbcValue = '{{fbc}}';
   var fbpValue = '{{fbp}}';
 
-  var links = document.querySelectorAll('a[href*="' + affiliateDomain + '"]');
-  for (var i = 0; i < links.length; i++) {
+  function appendParamsToLink(link) {
     try {
-      var link = links[i];
-      var url = document.createElement('a');
-      url.href = link.href;
-
-      // Append parameters
-      var separator = url.search ? '&' : '?';
-      link.href += separator + 'fbc=' + encodeURIComponent(fbcValue) + '&fbp=' + encodeURIComponent(fbpValue);
+      var href = link.href;
+      var separator = href.indexOf('?') !== -1 ? '&' : '?';
+      var newHref = href + separator + 'fbc=' + encodeURIComponent(fbcValue) + '&fbp=' + encodeURIComponent(fbpValue);
+      link.href = newHref;
     } catch (e) {
-      console.warn('Invalid URL skipped:', link.href);
+      console.warn('Failed to tag link:', link.href, e);
     }
   }
+
+  function tagAffiliateLinks() {
+    var links = document.querySelectorAll('a[href*="' + affiliateDomain + '"]');
+    for (var i = 0; i < links.length; i++) {
+      appendParamsToLink(links[i]);
+    }
+  }
+
+  // Run on DOM ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', tagAffiliateLinks);
+  } else {
+    tagAffiliateLinks();
+  }
+
+  // Observe dynamically added links
+  var observer = new MutationObserver(function(mutations) {
+    for (var i = 0; i < mutations.length; i++) {
+      var mutation = mutations[i];
+      for (var j = 0; j < mutation.addedNodes.length; j++) {
+        var node = mutation.addedNodes[j];
+        if (node.nodeType === 1) {
+          var newLinks = node.querySelectorAll ? node.querySelectorAll('a[href*="' + affiliateDomain + '"]') : [];
+          for (var k = 0; k < newLinks.length; k++) {
+            appendParamsToLink(newLinks[k]);
+          }
+        }
+      }
+    }
+  });
+
+  observer.observe(document.body, { childList: true, subtree: true });
 })();
 </script>
