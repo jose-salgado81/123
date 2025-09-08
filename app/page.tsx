@@ -1,6 +1,82 @@
 import Image from "next/image";
+import { useEffect } from "react";
 
 export default function Home() {
+  useEffect(() => {
+    function getCookie(name: string): string | undefined {
+      if (typeof document === "undefined") return undefined;
+      const match = document.cookie.match(new RegExp("(?:^|; )" + name.replace(/([.$?*|{}()\[\]\\\/\+^])/g, "\\$1") + "=([^;]*)"));
+      return match ? decodeURIComponent(match[1]) : undefined;
+    }
+
+    function getParamFromUrl(url: string, key: string): string | undefined {
+      try {
+        const u = new URL(url);
+        const v = u.searchParams.get(key);
+        return v || undefined;
+      } catch {
+        return undefined;
+      }
+    }
+
+    function resolveFbcFbp(anchor: HTMLAnchorElement) {
+      const fromHrefFbc = getParamFromUrl(anchor.href, "fbc");
+      const fromHrefFbp = getParamFromUrl(anchor.href, "fbp");
+      const cookieFbp = getCookie("_fbp");
+      const cookieFbc = getCookie("_fbc");
+      return {
+        fbc: fromHrefFbc || cookieFbc,
+        fbp: fromHrefFbp || cookieFbp,
+      };
+    }
+
+    function isOutbound(anchor: HTMLAnchorElement): boolean {
+      try {
+        const linkUrl = new URL(anchor.href);
+        return linkUrl.hostname !== window.location.hostname;
+      } catch {
+        return false;
+      }
+    }
+
+    function handleClick(e: MouseEvent) {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      const anchor = target.closest && target.closest("a");
+      if (!anchor) return;
+      if (!(anchor instanceof HTMLAnchorElement)) return;
+      if (!anchor.href) return;
+      if (!isOutbound(anchor)) return;
+
+      const { fbc, fbp } = resolveFbcFbp(anchor);
+      const payload = {
+        sourceUrl: window.location.href,
+        fbc,
+        fbp,
+      } as Record<string, unknown>;
+
+      try {
+        const json = JSON.stringify(payload);
+        const blob = new Blob([json], { type: "application/json" });
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon("/api/everflowclicktofb", blob);
+        } else {
+          // Fallback with keepalive so navigation is not blocked
+          fetch("/api/everflowclicktofb", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: json,
+            keepalive: true,
+          }).catch(() => {});
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    document.addEventListener("click", handleClick, true);
+    return () => document.removeEventListener("click", handleClick, true);
+  }, []);
   return (
     <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
       <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
