@@ -1,5 +1,6 @@
 <script>
 /* GTM Tag Name: "click listener" — added for reference */
+
 (function() {
   var affiliateDomain = 'freecash.com'; // Change if needed
 
