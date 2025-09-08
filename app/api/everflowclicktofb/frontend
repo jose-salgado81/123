@@ -1,0 +1,23 @@
+<script>
+/* GTM Tag Name: "tag link" */
+(function() {
+  var affiliateDomain = 'freecash.com';
+  var fbcValue = '{{fbc}}';
+  var fbpValue = '{{fbp}}';
+
+  var links = document.querySelectorAll('a[href*="' + affiliateDomain + '"]');
+  for (var i = 0; i < links.length; i++) {
+    try {
+      var link = links[i];
+      var url = document.createElement('a');
+      url.href = link.href;
+
+      // Append parameters
+      var separator = url.search ? '&' : '?';
+      link.href += separator + 'fbc=' + encodeURIComponent(fbcValue) + '&fbp=' + encodeURIComponent(fbpValue);
+    } catch (e) {
+      console.warn('Invalid URL skipped:', link.href);
+    }
+  }
+})();
+</script>
