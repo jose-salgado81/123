@@ -1,0 +1,37 @@
+<script>
+/* GTM Tag Name: "click listener" — added for reference */
+(function() {
+  var affiliateDomain = 'freecash.com'; // Change if needed
+
+  function sendClickToServer(link) {
+    var payload = {
+      fbc: '{{fbc}}',
+      fbp: '{{fbp}}',
+      fbclid: '{{fbclid}}',
+      href: link.href,
+      userAgent: navigator.userAgent,
+      sourceUrl: window.location.href
+    };
+
+    navigator.sendBeacon(
+      'https://123-five-gamma.vercel.app/api/everflowclicktofb',
+      new Blob([JSON.stringify(payload)], { type: 'application/json' })
+    );
+  }
+
+  function attachClickListeners() {
+    var links = document.querySelectorAll('a[href*="' + affiliateDomain + '"]');
+    for (var i = 0; i < links.length; i++) {
+      links[i].addEventListener('click', function(e) {
+        sendClickToServer(this);
+      });
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', attachClickListeners);
+  } else {
+    attachClickListeners();
+  }
+})();
+</script>
