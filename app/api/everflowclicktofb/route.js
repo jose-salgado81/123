@@ -49,9 +49,11 @@ export async function POST(request) {
         fbc,
         fbp,
         clientUserAgent,
-        sourceUrl,
-        client_ip_address
+        sourceUrl
     } = body;
+
+    // The check for 'clickId' has been removed. The function will now proceed
+    // whether or not this ID is provided by the front-end.
 
     try {
         // --- STEP 1: CONSTRUCT THE FACEBOOK CAPI PAYLOAD ---
@@ -65,18 +67,18 @@ export async function POST(request) {
                 action_source: 'website',
                 user_data: {
                     // Use client data for better attribution and deduplication
-                    client_ip_address: client_ip_address || request.headers['x-forwarded-for'] || request.headers['x-real-ip'] || request.ip,
+                    client_ip_address: request.headers['x-forwarded-for'] || request.headers['x-real-ip'] || request.ip,
                     client_user_agent: clientUserAgent,
                     // Use cookies for deduplication
                     fbc: fbc,
                     fbp: fbp,
+                    // Include the Facebook click ID for even better attribution
+                    fbclid: fbclid,
                 },
                 custom_data: {
                     // Use the unique click ID for event tracking and debugging
                     click_id: clickId,
                 },
-                // Include the Facebook click ID for even better attribution
-                fbclid: fbclid,
             }],
             // Use this optional parameter to ensure your events are deduplicated correctly
             test_event_code: null // Use 'TESTxxxx' from your Events Manager for testing
