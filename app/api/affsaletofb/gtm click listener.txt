@@ -1,0 +1,75 @@
+<script>
+    // This script is designed to be a Custom HTML Tag in Google Tag Manager.
+    // It is triggered by a "Click - Just Links" or "Click - All Elements" trigger.
+
+    // Helper function to get cookie values
+    var getCookieValue = function(name) {
+        var value = "; " + document.cookie;
+        var parts = value.split("; " + name + "=");
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return null;
+    };
+
+    // Helper function to get URL parameter values
+    var getUrlParameter = function(href, name) {
+        name = name.replace(/[\[\]]/g, '\\$&');
+        var regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)'),
+            results = regex.exec(href);
+        if (!results) return null;
+        if (!results[2]) return '';
+        return decodeURIComponent(results[2].replace(/\+/g, ' '));
+    };
+
+    // Vercel function URL
+    var vercelFunctionUrl = 'https://123-five-gamma.vercel.app/api/everflowclicktofb';
+
+    // These variables are GTM built-in variables and will be populated at runtime.
+    var clickUrl = {{Click URL}};
+    var clickText = {{Click Text}};
+    
+    // Check for a valid URL to proceed
+    if (clickUrl) {
+        // Fetch the user's IP address from a third-party service
+        fetch('https://api.ipify.org?format=json')
+            .then(function(response) {
+                return response.json();
+            })
+            .then(function(ipData) {
+                var payload = {
+                    event_name: 'OutboundClick',
+                    click_url: clickUrl,
+                    click_text: clickText,
+                    
+                    // Essential parameters for Facebook Conversions API
+                    fbc: getCookieValue('_fbc') || null,
+                    fbp: getCookieValue('_fbp') || null,
+                    fbclid: getUrlParameter(clickUrl, 'fbclid') || null,
+                    clientUserAgent: navigator.userAgent,
+                    sourceUrl: window.location.href,
+                    
+                    // The IP address fetched from the service
+                    client_ip_address: ipData.ip
+                };
+            
+                console.log("Sending payload to Vercel function:", payload);
+            
+                // Now, send the complete payload to your Vercel function
+                return fetch(vercelFunctionUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+            })
+            .then(function(response) {
+                return response.json();
+            })
+            .then(function(responseData) {
+                console.log("Response from Vercel function:", responseData);
+            })
+            .catch(function(error) {
+                console.error("Fetch request failed:", error);
+            });
+    }
+</script>
