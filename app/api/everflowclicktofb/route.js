@@ -52,14 +52,8 @@ export async function POST(request) {
         sourceUrl
     } = body;
 
-    // Check for essential data from the front-end.
-    // The 'clickId' is a unique identifier for the event.
-    if (!clickId) {
-        return new Response(JSON.stringify({ error: "No clickId provided." }), {
-            status: 400,
-            headers: { 'Content-Type': 'application/json' },
-        });
-    }
+    // The check for 'clickId' has been removed. The function will now proceed
+    // whether or not this ID is provided by the front-end.
 
     try {
         // --- STEP 1: CONSTRUCT THE FACEBOOK CAPI PAYLOAD ---
@@ -78,6 +72,8 @@ export async function POST(request) {
                     // Use cookies for deduplication
                     fbc: fbc,
                     fbp: fbp,
+                    // Include the Facebook click ID for even better attribution
+                    fbclid: fbclid,
                 },
                 custom_data: {
                     // Use the unique click ID for event tracking and debugging
