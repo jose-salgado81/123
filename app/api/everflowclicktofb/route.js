@@ -72,12 +72,9 @@ export async function POST(request) {
                     // Use cookies for deduplication
                     fbc: fbc,
                     fbp: fbp,
-                    // Include the Facebook click ID for even better attribution
-                    fbclid: fbclid,
                 },
                 custom_data: {
                     // Use the unique click ID for event tracking and debugging
-                    click_id: clickId,
                 },
             }],
             // Use this optional parameter to ensure your events are deduplicated correctly
